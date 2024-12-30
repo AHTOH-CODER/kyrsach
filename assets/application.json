@@ -1,0 +1,65 @@
+[
+    {
+    "storeName": "Магазин 1",
+    "orderDate": "2023-10-01",
+    "items": [
+        {
+        "name": "Яблоки",
+        "unit": "кг",
+        "quantity": 10
+        },
+        {
+        "name": "Бананы",
+        "unit": "кг",
+        "quantity": 5
+        },
+        {
+        "name": "Молоко",
+        "unit": "л",
+        "quantity": 2
+        }
+    ]
+    },
+    {
+    "storeName": "Магазин 2",
+    "orderDate": "2023-10-02",
+    "items": [
+        {
+        "name": "Хлеб",
+        "unit": "шт",
+        "quantity": 20
+        },
+        {
+        "name": "Сыр",
+        "unit": "кг",
+        "quantity": 3
+        },
+        {
+        "name": "Яйца",
+        "unit": "шт",
+        "quantity": 12
+        }
+    ]
+    },
+    {
+    "storeName": "Магазин 3",
+    "orderDate": "2023-10-03",
+    "items": [
+        {
+        "name": "Куриное филе",
+        "unit": "кг",
+        "quantity": 4
+        },
+        {
+        "name": "Рис",
+        "unit": "кг",
+        "quantity": 2
+        },
+        {
+        "name": "Огурцы",
+        "unit": "кг",
+        "quantity": 1
+        }
+    ]
+    }
+]
