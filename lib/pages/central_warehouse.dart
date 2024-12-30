@@ -49,21 +49,28 @@ class CentralWarehouseScreen extends StatelessWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showRegisterProductDialog(context);
-        },
-        child: const Icon(Icons.add),
-        tooltip: 'Зарегистрировать товар',
-      ),
-    );
+      floatingActionButton: level == 'admin' // Условие для отображения кнопки
+          ? FloatingActionButton(
+              onPressed: () {
+                _showRegisterProductDialog(context);
+              },
+              child: const Icon(Icons.add),
+              tooltip: 'Зарегистрировать товар',
+            )
+          : null, // Если уровень не admin, кнопка не отображается
+      );
   }
 
   Future<List<StockItem>> _loadStockItems() async {
-    final file = await _localFile;
-    String contents = await file.readAsString();
-    List<dynamic> jsonData = jsonDecode(contents);
-    return jsonData.map((item) => StockItem.fromJson(item)).toList();
+    try {
+      final file = await _localFile;
+      String contents = await file.readAsString();
+      List<dynamic> jsonData = jsonDecode(contents);
+      return jsonData.map((item) => StockItem.fromJson(item)).toList();
+    } catch (e) {
+      print('Ошибка при загрузке данных: $e');
+      return [];
+    }
   }
 
   Future<File> get _localFile async {
@@ -222,21 +229,22 @@ class CentralWarehouseScreen extends StatelessWidget {
   }
 
   Future<void> _saveStockItem(StockItem item) async {
-    final file = await _localFile;
-
-    // Загрузка существующих данных
-    List<StockItem> stockItems = [];
-    if (await file.exists()) {
-      String contents = await file.readAsString();
-      List<dynamic> jsonData = jsonDecode(contents);
-      stockItems = jsonData.map((item) => StockItem.fromJson(item)).toList();
+    try {
+      String jsonString = jsonEncode(item.toJson());
+      final filePath = 'assets/central_warehouse.json';
+      final file = File(filePath);
+      List<dynamic> stockItems = [];
+      if (await file.exists()) {
+        String fileContent = await file.readAsString();
+        if (fileContent.isNotEmpty) {
+          stockItems = jsonDecode(fileContent);
+        }
+      }
+      stockItems.add(item.toJson());
+      await file.writeAsString(jsonEncode(stockItems));
+      print('Элемент успешно сохранен!');
+    } catch (e) {
+      print('Ошибка при сохранении элемента: $e');
     }
-
-    // Добавление нового товара
-    stockItems.add(item);
-
-    // Сохранение обновленных данных обратно в файл
-    String jsonString = jsonEncode(stockItems.map((item) => item.toJson()).toList());
-    await file.writeAsString(jsonString);
   }
 }

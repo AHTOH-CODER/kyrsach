@@ -99,8 +99,16 @@ class StockItem {
   double price;
   int quantity;
   Supplier supplier;
+  String deliveryDate; // Добавлено поле deliveryDate
 
-  StockItem({required this.name, required this.unit, required this.price, required this.quantity, required this.supplier, required String deliveryDate});
+  StockItem({
+    required this.name,
+    required this.unit,
+    required this.price,
+    required this.quantity,
+    required this.supplier,
+    required this.deliveryDate, // Добавлено в конструктор
+  });
 
   factory StockItem.fromJson(Map<String, dynamic> json) {
     return StockItem(
@@ -109,9 +117,18 @@ class StockItem {
       price: json['price'],
       quantity: json['quantity'],
       supplier: Supplier.fromJson(json['supplier']),
-      deliveryDate: '',
+      deliveryDate: json['deliveryDate'], // Теперь правильно извлекаем deliveryDate
     );
   }
 
-  toJson() {}
+  Map<String, dynamic> toJson() { // Реализован метод toJson
+    return {
+      'name': name,
+      'unit': unit,
+      'price': price,
+      'quantity': quantity,
+      'supplier': supplier.toJson(), // Вызов метода toJson у Supplier
+      'deliveryDate': deliveryDate, // Добавлено в JSON представление
+    };
+  }
 }
