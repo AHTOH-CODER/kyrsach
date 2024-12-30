@@ -1,13 +1,31 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart';
 import 'package:kyrsach/models.dart';
 
-class CentralWarehouseScreen extends StatelessWidget {
+class CentralWarehouseScreen extends StatefulWidget {
   final String level;
 
   CentralWarehouseScreen({required this.level});
+
+  @override
+  State<CentralWarehouseScreen> createState() => _CentralWarehouseScreenState();
+}
+
+class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
+  late Future<List<StockItem>> items;
+  @override
+  void initState() {
+    super.initState();
+    items = _loadStores();
+  }
+
+  Future<List<StockItem>> _loadStores() async {
+    final String response = await rootBundle.loadString('assets/central_warehouse.json');
+    final List<dynamic> data = json.decode(response);
+    return data.map((storeJson) => StockItem.fromJson(storeJson)).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +34,7 @@ class CentralWarehouseScreen extends StatelessWidget {
         title: const Text('Центральный склад'),
       ),
       body: FutureBuilder<List<StockItem>>(
-        future: _loadStockItems(),
+        future: items,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -49,7 +67,7 @@ class CentralWarehouseScreen extends StatelessWidget {
           );
         },
       ),
-      floatingActionButton: level == 'admin' // Условие для отображения кнопки
+      floatingActionButton: widget.level == 'admin' // Условие для отображения кнопки
           ? FloatingActionButton(
               onPressed: () {
                 _showRegisterProductDialog(context);
