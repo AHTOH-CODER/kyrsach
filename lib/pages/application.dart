@@ -34,61 +34,121 @@ class _ApplicationPageState extends State<ApplicationPage> {
   }
 
   void _createApplication() {
-    // Function to create a new application
-    showDialog(
-      context: context,
-      builder: (context) {
-        String storeName = widget.store;
-        String date = DateTime.now().toIso8601String().split("T").first; // Current date
-        List<Product> orderedProducts = [];
+  showDialog(
+    context: context,
+    builder: (context) {
+      String storeName = '';
+      String orderDate = DateTime.now().toIso8601String().split("T").first; // Текущая дата
+      List<Map<String, dynamic>> orderedProducts = []; // Список для хранения продуктов
 
-        return AlertDialog(
-          title: Text('Создать заявку'),
-          content: Column(
+      return AlertDialog(
+        title: Text('Создать заявку'),
+        content: SingleChildScrollView(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Input fields for products
-              // You can implement a form with TextFields for each product
-              // For simplicity, let's assume we have a single product
               TextField(
-                decoration: InputDecoration(labelText: 'Название товара'),
-                onSubmitted: (value) {
-                  // Add product to the orderedProducts list
-                  orderedProducts.add(Product(name: value, unit: 'шт', quantity: 1)); // Default unit and quantity
+                decoration: InputDecoration(labelText: 'Название магазина'),
+                onChanged: (value) {
+                  storeName = value; // Сохраняем название магазина
                 },
               ),
-              // Add more fields as necessary
+              TextField(
+                decoration: InputDecoration(labelText: 'Дата заявки (YYYY-MM-DD)'),
+                onChanged: (value) {
+                  orderDate = value; // Сохраняем дату заявки
+                },
+              ),
+              // Поля для ввода товаров
+              ...orderedProducts.map((product) {
+                int index = orderedProducts.indexOf(product); // Получаем индекс товара
+                return Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        decoration: InputDecoration(labelText: 'Название товара'),
+                        onChanged: (value) {
+                          orderedProducts[index]['name'] = value; // Сохраняем название товара
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: TextField(
+                        decoration: InputDecoration(labelText: 'Единица измерения'),
+                        onChanged: (value) {
+                          orderedProducts[index]['unit'] = value; // Сохраняем единицу измерения
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: TextField(
+                        decoration: InputDecoration(labelText: 'Количество'),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) {
+                          orderedProducts[index]['quantity'] = int.tryParse(value) ?? 0; // Сохраняем количество
+                        },
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.remove),
+                      onPressed: () {
+                        setState(() {
+                          orderedProducts.removeAt(index); // Удаляем товар по индексу
+                        });
+                      },
+                    ),
+                  ],
+                );
+              }).toList(),
+              // Кнопка для добавления нового товара
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    orderedProducts.add({'name': '', 'unit': '', 'quantity': 0}); // Добавляем новый товар
+                  });
+                },
+                child: Text('Добавить товар'),
+              ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                // Create application logic here
-                if (orderedProducts.isNotEmpty) {
-                  Application newApplication = Application(
-                    storeName: storeName,
-                    orderDate: date,
-                    items: orderedProducts,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              if (storeName.isNotEmpty && orderDate.isNotEmpty && orderedProducts.isNotEmpty) {
+                List<Product> productsList = orderedProducts.map((product) {
+                  return Product(
+                    name: product['name'],
+                    unit: product['unit'],
+                    quantity: product['quantity'],
                   );
-                  setState(() {
-                    applications.add(newApplication);
-                  });
-                  Navigator.pop(context);
-                }
-              },
-              child: Text('Создать'),
-            ),
-            TextButton(
-              onPressed: () {
+                }).toList();
+
+                Application newApplication = Application(
+                  storeName: storeName,
+                  orderDate: orderDate,
+                  items: productsList,
+                );
+
+                setState(() {
+                  applications.add(newApplication); // Добавляем новую заявку в список
+                });
                 Navigator.pop(context);
-              },
-              child: Text('Отмена'),
-            ),
-          ],
-        );
-      },
-    );
-  }
+              }
+            },
+            child: Text('Создать'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: Text('Отмена'),
+          ),
+        ],
+      );
+    },
+  );
+}
 
   void _acceptApplication(Application application) {
     // Logic to accept application
