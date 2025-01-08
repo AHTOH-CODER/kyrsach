@@ -1,3 +1,5 @@
+import 'package:kyrsach/pages/profile.dart';
+
 class Product {
   String name;
   String unit;
@@ -99,7 +101,7 @@ class StockItem {
   double price;
   int quantity;
   Supplier supplier;
-  String deliveryDate; // Добавлено поле deliveryDate
+  String deliveryDate; 
 
   StockItem({
     required this.name,
@@ -107,7 +109,7 @@ class StockItem {
     required this.price,
     required this.quantity,
     required this.supplier,
-    required this.deliveryDate, // Добавлено в конструктор
+    required this.deliveryDate, 
   });
 
   factory StockItem.fromJson(Map<String, dynamic> json) {
@@ -117,18 +119,84 @@ class StockItem {
       price: json['price'],
       quantity: json['quantity'],
       supplier: Supplier.fromJson(json['supplier']),
-      deliveryDate: json['deliveryDate'], // Теперь правильно извлекаем deliveryDate
+      deliveryDate: json['deliveryDate'],
     );
   }
 
-  Map<String, dynamic> toJson() { // Реализован метод toJson
+  Map<String, dynamic> toJson() { 
     return {
       'name': name,
       'unit': unit,
       'price': price,
       'quantity': quantity,
-      'supplier': supplier.toJson(), // Вызов метода toJson у Supplier
-      'deliveryDate': deliveryDate, // Добавлено в JSON представление
+      'supplier': supplier.toJson(), 
+      'deliveryDate': deliveryDate, 
+    };
+  }
+}
+
+
+class OrderItem {
+  String status;
+  String storeName;
+  String orderDate; 
+  Product product;
+
+  OrderItem({
+    required this.status,
+    required this.storeName,
+    required this.orderDate, 
+    required this.product,
+  });
+
+  factory OrderItem.fromJson(Map<String, dynamic> json) {
+    return OrderItem(
+      status: json['status'],
+      storeName: json['storeName'],
+      orderDate: json['orderDate'],
+      product: Product.fromJson(json['product']),
+    );
+  }
+
+  Map<String, dynamic> toJson() { 
+    return {
+      'status': status,
+      'storeName': storeName, 
+      'orderDate': orderDate, 
+      'product': product.toJson(),
+    };
+  }
+}
+
+
+class SellItem {
+  String price;
+  Profile profile;
+  String sellDate; 
+  Product product;
+
+  SellItem({
+    required this.price,
+    required this.profile,
+    required this.sellDate,
+    required this.product,
+  });
+
+  factory SellItem.fromJson(Map<String, dynamic> json) {
+    return SellItem(
+      price: json['price'],
+      profile: Profile.fromJson(json['profile']),
+      sellDate: json['sellDate'],
+      product: Product.fromJson(json['product']),
+    );
+  }
+
+  Map<String, dynamic> toJson() { 
+    return {
+      'price': price,
+      'profile': profile.toJson(),
+      'orderDate': sellDate, 
+      'product': product.toJson(),
     };
   }
 }

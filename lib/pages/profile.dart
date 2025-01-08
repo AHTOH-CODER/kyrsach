@@ -45,8 +45,25 @@ class Profile {
     );
   }
 
+  Map<String, dynamic> toJson() { 
+    return {
+      'login': login,
+      'password': password,
+      'level': level,
+      'store': store,
+      'department': department,
+      'fullName': fullName,
+      'gender': gender,
+      'age': age,
+      'address': address,
+      'workExperience': workExperience,
+      'qualification': qualification,
+    };
+  }
   get storeName => null;
 }
+  
+
 
 class ProfileScreen extends StatefulWidget {
   final Function(Profile?) onProfileChanged;
@@ -148,10 +165,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ElevatedButton(
                     onPressed: () {
                       setState(() {
-                        _currentProfile = null; // Сброс профиля
+                        _currentProfile = null; 
                       });
-                      widget.onProfileChanged(null); // Уведомление о сбросе профиля
-                      Navigator.pop(context); // Закрытие диалога
+                      widget.onProfileChanged(null); 
+                      Navigator.pop(context); 
                     },
                     child: Text('Выйти'),
                   ),

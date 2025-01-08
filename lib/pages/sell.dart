@@ -3,28 +3,29 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kyrsach/models.dart';
+import 'package:kyrsach/pages/profile.dart';
 
-class CentralWarehouseScreen extends StatefulWidget {
-  final String level;
+class SellPage extends StatefulWidget {
+  final Profile profile;
 
-  CentralWarehouseScreen({required this.level});
+  SellPage({required this.profile});
 
   @override
-  State<CentralWarehouseScreen> createState() => _CentralWarehouseScreenState();
+  State<SellPage> createState() => _SellPage();
 }
 
-class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
-  late Future<List<StockItem>> items;
+class _SellPage extends State<SellPage> {
+  late Future<List<SellItem>> items;
   @override
   void initState() {
     super.initState();
     items = _loadStores();
   }
 
-  Future<List<StockItem>> _loadStores() async {
-    final String response = await rootBundle.loadString('assets/central_warehouse.json');
+  Future<List<SellItem>> _loadStores() async {
+    final String response = await rootBundle.loadString('assets/sell.json');
     final List<dynamic> data = json.decode(response);
-    return data.map((storeJson) => StockItem.fromJson(storeJson)).toList();
+    return data.map((storeJson) => SellItem.fromJson(storeJson)).toList();
   }
 
   @override
@@ -33,7 +34,7 @@ class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
       appBar: AppBar(
         title: const Text('Центральный склад'),
       ),
-      body: FutureBuilder<List<StockItem>>(
+      body: FutureBuilder<List<SellItem>>(
         future: items,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -44,12 +45,12 @@ class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
             return const Center(child: Text('Нет данных'));
           }
 
-          final stockItems = snapshot.data!;
+          final SellItems = snapshot.data!;
 
           return ListView.builder(
-            itemCount: stockItems.length,
+            itemCount: SellItems.length,
             itemBuilder: (context, index) {
-              final item = stockItems[index];
+              final item = SellItems[index];
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 3.0),
                 child: Container(
@@ -79,12 +80,12 @@ class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
       );
   }
 
-  Future<List<StockItem>> _loadStockItems() async {
+  Future<List<SellItem>> _loadSellItems() async {
     try {
       final file = await _localFile;
       String contents = await file.readAsString();
       List<dynamic> jsonData = jsonDecode(contents);
-      return jsonData.map((item) => StockItem.fromJson(item)).toList();
+      return jsonData.map((item) => SellItem.fromJson(item)).toList();
     } catch (e) {
       print('Ошибка при загрузке данных: $e');
       return [];
@@ -212,7 +213,7 @@ class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
                 }
 
                 
-                final newItem = StockItem(
+                final newItem = SellItem(
                   name: nameController.text,
                   unit: unitController.text,
                   price: double.tryParse(priceController.text) ?? 0.0,
@@ -229,7 +230,7 @@ class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
                   deliveryDate: deliveryDateController.text,
                 );
 
-                await _saveStockItem(newItem);
+                await _saveSellItem(newItem);
                 Navigator.of(context).pop();
               },
               child: const Text('Сохранить'),
@@ -246,20 +247,20 @@ class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
     );
   }
 
-  Future<void> _saveStockItem(StockItem item) async {
+  Future<void> _saveSellItem(SellItem item) async {
     try {
       // String jsonString = jsonEncode(item.toJson());
       final filePath = 'assets/central_warehouse.json';
       final file = File(filePath);
-      List<dynamic> stockItems = [];
+      List<dynamic> SellItems = [];
       if (await file.exists()) {
         String fileContent = await file.readAsString();
         if (fileContent.isNotEmpty) {
-          stockItems = jsonDecode(fileContent);
+          SellItems = jsonDecode(fileContent);
         }
       }
-      stockItems.add(item.toJson());
-      await file.writeAsString(jsonEncode(stockItems));
+      SellItems.add(item.toJson());
+      await file.writeAsString(jsonEncode(SellItems));
       print('Элемент успешно сохранен!');
     } catch (e) {
       print('Ошибка при сохранении элемента: $e');

@@ -31,7 +31,7 @@ class StoreListScreen extends StatefulWidget {
 
 class _StoreListScreenState extends State<StoreListScreen> {
   List<Store> stores = [];
-  Profile? _currentProfile; // Хранение текущего профиля
+  Profile? _currentProfile;
 
   @override
   void initState() {
@@ -56,14 +56,14 @@ class _StoreListScreenState extends State<StoreListScreen> {
           content: ProfileScreen(
             onProfileChanged: (profile) {
               setState(() {
-                _currentProfile = profile; // Обновление текущего профиля
+                _currentProfile = profile; 
               });
             },
           ),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // Закрытие диалога
+                Navigator.pop(context);
               },
               child: Text('Закрыть'),
             ),
@@ -95,6 +95,20 @@ class _StoreListScreenState extends State<StoreListScreen> {
     }
   }
 
+  void _navigatesellPage() {  
+    if (_currentProfile == null) {
+      _showErrorDialog('Пожалуйста, войдите в систему для доступа к продажам.');
+    } 
+    // else {
+    //   Navigator.push(
+    //     context,
+    //     MaterialPageRoute(builder: (context) => SellPage()),
+    //   );
+    // }
+  }
+
+
+
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
@@ -105,7 +119,7 @@ class _StoreListScreenState extends State<StoreListScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // Закрытие диалога
+                Navigator.pop(context);
               },
               child: Text('Закрыть'),
             ),
@@ -123,7 +137,7 @@ class _StoreListScreenState extends State<StoreListScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.person),
-            onPressed: _showProfile, // Открытие страницы профиля
+            onPressed: _showProfile,
           ),
         ],
       ),
@@ -157,15 +171,21 @@ class _StoreListScreenState extends State<StoreListScreen> {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           FloatingActionButton(
-            onPressed: _navigateToApplicationPage, // Переход на страницу заявок
-            child: Icon(Icons.list_alt), // Иконка для заявок
+            onPressed: _navigateToApplicationPage, 
+            child: Icon(Icons.list_alt), 
             tooltip: 'Заявки',
           ),
-          SizedBox(width: 16), // Отступ между кнопками
+          SizedBox(width: 16), 
           FloatingActionButton(
-            onPressed: _navigateToCentralWarehouse, // Переход на центральный склад
+            onPressed: _navigateToCentralWarehouse,
             child: Icon(Icons.storage),
             tooltip: 'Центральный склад',
+          ),
+          SizedBox(width: 16),
+          FloatingActionButton(
+            onPressed: _navigatesellPage,
+            child: Icon(Icons.money),
+            tooltip: 'Продажа',
           ),
         ],
       ),
