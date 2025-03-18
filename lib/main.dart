@@ -5,6 +5,7 @@ import 'package:kyrsach/pages/central_warehouse.dart';
 import 'dart:convert';
 import 'package:kyrsach/pages/profile.dart';
 import 'package:kyrsach/pages/application.dart';
+import 'package:kyrsach/pages/sell.dart';
 
 
 void main() {
@@ -99,12 +100,12 @@ class _StoreListScreenState extends State<StoreListScreen> {
     if (_currentProfile == null) {
       _showErrorDialog('Пожалуйста, войдите в систему для доступа к продажам.');
     } 
-    // else {
-    //   Navigator.push(
-    //     context,
-    //     MaterialPageRoute(builder: (context) => SellPage()),
-    //   );
-    // }
+    else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => SellPage(profile: _currentProfile,)),
+      );
+    }
   }
 
 

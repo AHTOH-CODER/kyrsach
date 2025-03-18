@@ -170,7 +170,7 @@ class OrderItem {
 
 
 class SellItem {
-  String price;
+  double price;
   Profile profile;
   String sellDate; 
   Product product;
@@ -195,7 +195,7 @@ class SellItem {
     return {
       'price': price,
       'profile': profile.toJson(),
-      'orderDate': sellDate, 
+      'sellDate': sellDate, 
       'product': product.toJson(),
     };
   }
