@@ -3,8 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kyrsach/models.dart';
-import 'package:path_provider/path_provider.dart';
-
 
 class ApplicationPage extends StatefulWidget {
   final String level;
@@ -17,7 +15,6 @@ class ApplicationPage extends StatefulWidget {
 }
 
 class _ApplicationPageState extends State<ApplicationPage> {
-  // Profile? _currentProfile;
   late Future<List<OrderItem>> items;
 
   @override
@@ -26,81 +23,99 @@ class _ApplicationPageState extends State<ApplicationPage> {
     items = _loadApplications();
   }
 
-  Future<List<OrderItem>> _loadApplications() async {
-    final String response = await rootBundle.loadString('assets/application.json');
-    final List<dynamic> data = json.decode(response);
+Future<List<OrderItem>> _loadApplications() async {
+  try {
+    final file = File('assets/application.json');
+    
+    final content = await file.readAsString();
+    final List<dynamic> data = json.decode(content);
     return data.map((storeJson) => OrderItem.fromJson(storeJson)).toList();
+  } catch (e) {
+    print('Ошибка загрузки заявок: $e');
+    return [];
   }
+}
 
   void _createApplication(BuildContext context) {
-    // final TextEditingController storeNameController = TextEditingController();
-    final TextEditingController orderDateController = TextEditingController(); 
-    final TextEditingController nameController = TextEditingController();
-    final TextEditingController unitController = TextEditingController();
-    final TextEditingController quantityController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final orderDateController = TextEditingController(); 
+    final nameController = TextEditingController();
+    final quantityController = TextEditingController();
+    String selectedUnit = 'шт';
     
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: const Text('Регистрация товара'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // TextField(
-                //   controller: storeNameController,
-                //   decoration: const InputDecoration(labelText: 'Название магазина'),
-                // ),
-                Text('Магазин: ${widget.store}'),
-                TextField(
-                  controller: orderDateController,
-                  decoration: const InputDecoration(labelText: 'Дата заявки (ДД.ММ.ГГГГ)'),
-                ),
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Название товара'),
-                ),
-                TextField(
-                  controller: quantityController,
-                  decoration: const InputDecoration(labelText: 'Количество'),
-                ),
-                TextField(
-                  controller: unitController, 
-                  decoration: const InputDecoration(labelText: 'Единицы измерения'),
-                ),
-              ],
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Магазин: ${widget.store}'),
+                  TextFormField(
+                    controller: orderDateController,
+                    decoration: const InputDecoration(labelText: 'Дата заявки (ДД.ММ.ГГГГ)'),
+                    validator: (value) => value?.isEmpty ?? true ? 'Обязательное поле' : null,
+                  ),
+                  TextFormField(
+                    controller: nameController,
+                    decoration: const InputDecoration(labelText: 'Название товара'),
+                    validator: (value) => value?.isEmpty ?? true ? 'Обязательное поле' : null,
+                  ),
+                  TextFormField(
+                    controller: quantityController,
+                    decoration: const InputDecoration(labelText: 'Количество'),
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value?.isEmpty ?? true) return 'Обязательное поле';
+                      if (int.tryParse(value!) == null) return 'Введите число';
+                      return null;
+                    },
+                  ),
+                  DropdownButtonFormField<String>(
+                    value: selectedUnit,
+                    items: ['шт', 'л', 'кг'].map((unit) => 
+                      DropdownMenuItem(value: unit, child: Text(unit))
+                    ).toList(),
+                    onChanged: (v) => selectedUnit = v!,
+                    decoration: const InputDecoration(labelText: 'Единица измерения'),
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [
             TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Отмена'),
+            ),
+            ElevatedButton(
               onPressed: () async {
-               
-                if (orderDateController.text.isEmpty || nameController.text.isEmpty || quantityController.text.isEmpty || nameController.text.isEmpty || quantityController.text.isEmpty || unitController.text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Пожалуйста, заполните все поля!')),
+                if (formKey.currentState?.validate() ?? false) {
+                  final newItem = OrderItem(
+                    status: 'Без ответа',
+                    storeName: widget.store,
+                    orderDate: orderDateController.text,
+                    product: Product(
+                      name: nameController.text, 
+                      unit: selectedUnit, 
+                      quantity: int.parse(quantityController.text),
+                    ),
                   );
-                  return;
+
+                  await _saveOrderItem(newItem);
+                  setState(() => items = _loadApplications());
+                  Navigator.pop(context);
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Заявка успешно создана!')),
+                  );
                 }
-
-                
-                final newItem = OrderItem(
-                  status: 'Без ответа',
-                  storeName: widget.store,
-                  orderDate: orderDateController.text,
-                  product: Product(name: nameController.text, unit: unitController.text, quantity: int.tryParse(quantityController.text) ?? 0,),
-                );
-
-                await _saveOrderItem(newItem);
-                Navigator.of(context).pop();
               },
               child: const Text('Сохранить'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Отмена'),
             ),
           ],
         );
@@ -109,94 +124,183 @@ class _ApplicationPageState extends State<ApplicationPage> {
   }
 
 
-   void _acceptApplication(BuildContext context, OrderItem item) async {
-    // Логика для принятия заявки
-    // Здесь мы проверяем, есть ли достаточно запасов на складе
-    // Если да, обновляем статус заявки на "Принято"
-    // Если нет, показываем сообщение об ошибке
-
-    // Пример проверки наличия запасов
-    bool hasStock = await _checkStock(item); // Предполагаем, что у вас есть метод для проверки запасов
-
-    if (hasStock) {
-      item.status = 'Принято';
-      await _saveUpdatedOrderItems(item); // Сохраняем изменения в файле
-
-      // Уведомляем пользователя
+  void _acceptApplication(BuildContext context, OrderItem item) async {
+    try {
+      // 1. Загружаем данные центрального склада
+      final String warehouseResponse = await rootBundle.loadString('assets/warehouse_inventory.json');
+      List<dynamic> warehouseData = json.decode(warehouseResponse);
+      
+      // 2. Ищем нужный товар на складе
+      bool productFound = false;
+      bool enoughQuantity = false;
+      int warehouseIndex = -1;
+      
+      for (int i = 0; i < warehouseData.length; i++) {
+        if (warehouseData[i]['name'] == item.product.name && 
+            warehouseData[i]['unit'] == item.product.unit) {
+          productFound = true;
+          warehouseIndex = i;
+          if (warehouseData[i]['quantity'] >= item.product.quantity) {
+            enoughQuantity = true;
+          }
+          break;
+        }
+      }
+      
+      if (!productFound) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Товар ${item.product.name} не найден на центральном складе!')),
+        );
+        return;
+      }
+      
+      if (!enoughQuantity) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Недостаточно товара ${item.product.name} на центральном складе!')),
+        );
+        return;
+      }
+      
+      // 3. Загружаем данные магазинов
+      final String storesResponse = await rootBundle.loadString('assets/stores.json');
+      List<dynamic> storesData = json.decode(storesResponse);
+      
+      // 4. Находим нужный магазин и обновляем его инвентарь
+      bool storeFound = false;
+      int storeIndex = -1;
+      int productIndex = -1;
+      
+      for (int i = 0; i < storesData.length; i++) {
+        if (storesData[i]['name'] == item.storeName) {
+          storeFound = true;
+          storeIndex = i;
+          
+          // Проверяем, есть ли уже такой товар в магазине
+          for (int j = 0; j < storesData[i]['products'].length; j++) {
+            if (storesData[i]['products'][j]['name'] == item.product.name && 
+                storesData[i]['products'][j]['unit'] == item.product.unit) {
+              productIndex = j;
+              break;
+            }
+          }
+          break;
+        }
+      }
+      
+      if (!storeFound) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Магазин ${item.storeName} не найден!')),
+        );
+        return;
+      }
+      
+      // 5. Обновляем данные
+      
+      // Уменьшаем количество на центральном складе
+      warehouseData[warehouseIndex]['quantity'] -= item.product.quantity;
+      
+      // Обновляем или добавляем товар в магазин
+      if (productIndex != -1) {
+        // Товар уже есть в магазине - увеличиваем количество
+        storesData[storeIndex]['products'][productIndex]['quantity'] += item.product.quantity;
+      } else {
+        // Товара нет в магазине - добавляем новый
+        storesData[storeIndex]['products'].add({
+          'name': item.product.name,
+          'unit': item.product.unit,
+          'quantity': item.product.quantity
+        });
+      }
+      
+      // 6. Сохраняем обновленные данные
+      
+      // Сохраняем обновленный центральный склад
+      final warehouseFile = File('assets/warehouse_inventory.json');
+      await warehouseFile.writeAsString(jsonEncode(warehouseData));
+      
+      // Сохраняем обновленные данные магазинов
+      final storesFile = File('assets/stores.json');
+      await storesFile.writeAsString(jsonEncode(storesData));
+      
+      // Обновляем статус заявки
+      await _updateApplicationStatus(item, 'Принято');
+      
+      setState(() {
+        items = _loadApplications();
+      });
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Заявка принята!')),
+        SnackBar(content: Text('Заявка принята! Товар перемещен в магазин.')),
       );
-    } else {
-      // Если запасов недостаточно, показываем сообщение об ошибке
+      
+      Navigator.of(context).pop();
+      
+    } catch (e) {
+      print('Ошибка при принятии заявки: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Недостаточно запасов для принятия заявки!')),
+        SnackBar(content: Text('Произошла ошибка при обработке заявки: $e')),
       );
     }
   }
 
   void _rejectApplication(BuildContext context, OrderItem item) async {
-    // Здесь мы можем изменить статус заявки на "Отклонено"
-    item.status = 'Отклонено';
-
-    // Сохраняем изменения в файле
-    await _saveUpdatedOrderItems(item);
-
-    // Уведомляем пользователя
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Заявка отклонена!')),
-    );
-  }
-
- Future<void> _saveUpdatedOrderItems(OrderItem updatedItem) async {
     try {
-      // Получаем директорию документов
-      final documentsDir = await getApplicationDocumentsDirectory();
-      final file = File('${documentsDir.path}/application.json');
-
-      // Проверяем, существует ли файл, и если нет, создаем его с пустым списком
-      if (!await file.exists()) {
-        await file.create(recursive: true);
-        await file.writeAsString(jsonEncode([]));
-        print('Файл создан!');
-      }
-       // Читаем существующие заявки из файла в директории документов
-       String fileContent = await file.readAsString();
-       List<dynamic> orderItems = [];
-       if (fileContent.isNotEmpty) {
-         orderItems = jsonDecode(fileContent);
-       }
-
-      // Обновляем список заявок
-      List<Map<String, dynamic>> updatedItems = orderItems.map((dynamic json) {
-        OrderItem item = OrderItem.fromJson(json);
-        if (item.storeName == updatedItem.storeName && item.orderDate == updatedItem.orderDate && item.product == updatedItem.product) {
-          return updatedItem.toJson();
-        } else {
-          return item.toJson();
-        }
-      }).toList();
-
-      // Сохраняем обновленный список заявок обратно в файл
-      await file.writeAsString(jsonEncode(updatedItems));
-      print('Заявки успешно обновлены!');
-
-      // Проверка содержимого файла после сохранения:
-      String savedContent = await file.readAsString();
-      print('Содержимое файла после сохранения:\n$savedContent');
+      // Обновляем статус заявки
+      await _updateApplicationStatus(item, 'Отклонено');
+      
+      // Обновляем UI
+      setState(() {
+        items = _loadApplications();
+      });
+      
+      // Уведомляем пользователя
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Заявка отклонена!')),
+      );
+      
+      Navigator.of(context).pop();
     } catch (e) {
-      print('Ошибка при обновлении заявок: $e');
+      print('Ошибка при отклонении заявки: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Произошла ошибка при отклонении заявки: $e')),
+      );
     }
   }
 
-  Future<bool> _checkStock(OrderItem item) async {
-    // Замените этот код на вашу логику проверки запасов
-    // Например, можно получить информацию о запасах из API
-    // или из локальной базы данных
-  
-    await Future.delayed(Duration(seconds: 1));
-    return item.product.quantity > 0; // Возвращаем true, если есть запасы
+Future<void> _updateApplicationStatus(OrderItem item, String newStatus) async {
+  try {
+    final file = File('assets/application.json');
     
+    // Загружаем текущие заявки
+    final content = await file.readAsString();
+    List<dynamic> applications = json.decode(content);
+    
+    // Находим и обновляем нужную заявку
+    bool found = false;
+    for (int i = 0; i < applications.length; i++) {
+      var app = applications[i];
+      if (app['storeName'] == item.storeName &&
+          app['orderDate'] == item.orderDate &&
+          app['product']['name'] == item.product.name &&
+          app['product']['quantity'] == item.product.quantity &&
+          app['product']['unit'] == item.product.unit) {
+        applications[i]['status'] = newStatus;
+        found = true;
+        break;
+      }
+    }
+    
+    if (!found) {
+      throw Exception('Заявка не найдена для обновления');
+    }
+    
+    // Сохраняем обновленные заявки
+    await file.writeAsString(jsonEncode(applications));
+  } catch (e) {
+    print('Ошибка при обновлении статуса заявки: $e');
+    throw e;
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -215,7 +319,7 @@ class _ApplicationPageState extends State<ApplicationPage> {
             return const Center(child: Text('Нет данных'));
           }
 
-          final orderItems = snapshot.data!;
+          final orderItems = snapshot.data!.reversed.toList();
           
           return ListView.builder(
             itemCount: orderItems.length,
@@ -252,7 +356,6 @@ class _ApplicationPageState extends State<ApplicationPage> {
                               children: [
                                 Text('Название: ${item.product.name}'),
                                 Text('Количество: ${item.product.quantity} ${item.product.unit}'),
-                                Text('Единицы измерения: ${item.product.unit}'),
                               ],
                             ),
                             actions: [

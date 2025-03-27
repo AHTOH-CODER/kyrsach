@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kyrsach/models.dart';
+import 'package:kyrsach/pages/warehouse_inventory.dart';
 
 class CentralWarehouseScreen extends StatefulWidget {
   final String level;
@@ -15,13 +16,14 @@ class CentralWarehouseScreen extends StatefulWidget {
 
 class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
   late Future<List<StockItem>> items;
+  
   @override
   void initState() {
     super.initState();
-    items = _loadStores();
+    items = _loadStockItems();
   }
 
-  Future<List<StockItem>> _loadStores() async {
+  Future<List<StockItem>> _loadStockItems() async {
     final String response = await rootBundle.loadString('assets/central_warehouse.json');
     final List<dynamic> data = json.decode(response);
     return data.map((storeJson) => StockItem.fromJson(storeJson)).toList();
@@ -44,7 +46,7 @@ class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
             return const Center(child: Text('Нет данных'));
           }
 
-          final stockItems = snapshot.data!;
+          final stockItems = snapshot.data!.reversed.toList();
 
           return ListView.builder(
             itemCount: stockItems.length,
@@ -67,34 +69,95 @@ class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
           );
         },
       ),
-      floatingActionButton: widget.level == 'admin'
-          ? FloatingActionButton(
-              onPressed: () {
-                _showRegisterProductDialog(context);
-              },
-              child: const Icon(Icons.add),
-              tooltip: 'Зарегистрировать товар',
-            )
-          : null, 
-      );
+      floatingActionButton: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          if (widget.level == 'admin')
+            FloatingActionButton(
+            onPressed: () {
+              _showRegisterProductDialog(context);
+            },
+            child: const Icon(Icons.add),
+            tooltip: 'Зарегистрировать товар',
+          ),
+          SizedBox(width: 16), 
+          FloatingActionButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => WarehouseInventory()),
+              );
+            },
+            child: const Icon(Icons.inventory),
+            tooltip: 'Содержимое склада',
+          ),
+        ],
+      ),
+    );
   }
 
-  Future<List<StockItem>> _loadStockItems() async {
+  Future<void> _saveProductToInventory(Product product) async {
     try {
-      final file = await _localFile;
-      String contents = await file.readAsString();
-      List<dynamic> jsonData = jsonDecode(contents);
-      return jsonData.map((item) => StockItem.fromJson(item)).toList();
+      final filePath = 'assets/warehouse_inventory.json';
+      final file = File(filePath);
+      List<dynamic> products = [];
+      
+      if (await file.exists()) {
+        String fileContent = await file.readAsString();
+        if (fileContent.isNotEmpty) {
+          products = jsonDecode(fileContent);
+        }
+      }
+      
+      // Проверяем, есть ли уже такой продукт
+      bool productExists = false;
+      for (int i = 0; i < products.length; i++) {
+        if (products[i]['name'] == product.name && products[i]['unit'] == product.unit) {
+          products[i]['quantity'] += product.quantity;
+          productExists = true;
+          break;
+        }
+      }
+      
+      if (!productExists) {
+        products.add(product.toJson());
+      }
+      
+      await file.writeAsString(jsonEncode(products));
+      print('Продукт успешно сохранен в инвентарь!');
     } catch (e) {
-      print('Ошибка при загрузке данных: $e');
-      return [];
+      print('Ошибка при сохранении продукта в инвентарь: $e');
     }
   }
 
-  Future<File> get _localFile async {
-    return File('pages/central_warehouse.json');
+  Future<void> _saveStockItem(StockItem item) async {
+    try {
+      final filePath = 'assets/central_warehouse.json';
+      final file = File(filePath);
+      List<dynamic> stockItems = [];
+      if (await file.exists()) {
+        String fileContent = await file.readAsString();
+        if (fileContent.isNotEmpty) {
+          stockItems = jsonDecode(fileContent);
+        }
+      }
+      stockItems.add(item.toJson());
+      await file.writeAsString(jsonEncode(stockItems));
+      
+      // Сохраняем продукт в инвентарь
+      await _saveProductToInventory(Product(
+        name: item.name,
+        unit: item.unit,
+        quantity: item.quantity,
+      ));
+      
+      print('Элемент успешно сохранен!');
+    } catch (e) {
+      print('Ошибка при сохранении элемента: $e');
+    }
   }
 
+  // Остальные методы остаются без изменений
   void _showSupplierInfo(BuildContext context, Supplier supplier) {
     showDialog(
       context: context,
@@ -126,143 +189,151 @@ class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
     );
   }
 
-  void _showRegisterProductDialog(BuildContext context) {
-    final TextEditingController nameController = TextEditingController();
-    final TextEditingController supplierNameController = TextEditingController(); 
-    final TextEditingController addressController = TextEditingController();
-    final TextEditingController directorNameController = TextEditingController();
-    final TextEditingController phoneController = TextEditingController();
-    final TextEditingController bankController = TextEditingController();
-    final TextEditingController accountNumberController = TextEditingController();
-    final TextEditingController innController = TextEditingController();
-    final TextEditingController deliveryDateController = TextEditingController();
-    final TextEditingController unitController = TextEditingController(); 
-    final TextEditingController priceController = TextEditingController();
-    final TextEditingController quantityController = TextEditingController();
+   void _showRegisterProductDialog(BuildContext context) {
+    final formKey = GlobalKey<FormState>();
+    final nameController = TextEditingController();
+    final supplierNameController = TextEditingController();
+    final addressController = TextEditingController();
+    final directorNameController = TextEditingController();
+    final phoneController = TextEditingController();
+    final bankController = TextEditingController();
+    final accountNumberController = TextEditingController();
+    final innController = TextEditingController();
+    final deliveryDateController = TextEditingController();
+    final priceController = TextEditingController();
+    final quantityController = TextEditingController();
+    
+    String selectedUnit = 'шт';
 
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Регистрация товара'),
-          content: SingleChildScrollView(
+      builder: (context) => AlertDialog(
+        title: const Text('Новый товар'),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
+                const Text('Информация о поставщике', style: TextStyle(fontWeight: FontWeight.bold)),
+                TextFormField(
                   controller: supplierNameController,
-                  decoration: const InputDecoration(labelText: 'Название поставщика'),
+                  decoration: const InputDecoration(labelText: 'Название*'),
+                  validator: (v) => v?.isEmpty ?? true ? 'Обязательное поле' : null,
                 ),
-                TextField(
+                TextFormField(
                   controller: addressController,
-                  decoration: const InputDecoration(labelText: 'Адрес поставщика'),
+                  decoration: const InputDecoration(labelText: 'Адрес*'),
+                  validator: (v) => v?.isEmpty ?? true ? 'Обязательное поле' : null,
                 ),
-                TextField(
+                TextFormField(
                   controller: directorNameController,
-                  decoration: const InputDecoration(labelText: 'ФИО руководителя'),
+                  decoration: const InputDecoration(labelText: 'Руководитель*'),
+                  validator: (v) => v?.isEmpty ?? true ? 'Обязательное поле' : null,
                 ),
-                TextField(
+                TextFormField(
                   controller: phoneController,
-                  decoration: const InputDecoration(labelText: 'Телефон'),
+                  decoration: const InputDecoration(labelText: 'Телефон*'),
+                  validator: (v) => v?.isEmpty ?? true ? 'Обязательное поле' : null,
+                  keyboardType: TextInputType.phone,
                 ),
-                TextField(
+                TextFormField(
                   controller: bankController,
-                  decoration: const InputDecoration(labelText: 'Банк поставщика'),
+                  decoration: const InputDecoration(labelText: 'Банк*'),
+                  validator: (v) => v?.isEmpty ?? true ? 'Обязательное поле' : null,
                 ),
-                TextField(
+                TextFormField(
                   controller: accountNumberController,
-                  decoration: const InputDecoration(labelText: 'Расчетный счет'),
+                  decoration: const InputDecoration(labelText: 'Счет*'),
+                  validator: (v) => v?.isEmpty ?? true ? 'Обязательное поле' : null,
+                  keyboardType: TextInputType.number,
                 ),
-                TextField(
+                TextFormField(
                   controller: innController,
-                  decoration: const InputDecoration(labelText: 'ИНН'),
+                  decoration: const InputDecoration(labelText: 'ИНН*'),
+                  validator: (v) => v?.isEmpty ?? true ? 'Обязательное поле' : null,
+                  keyboardType: TextInputType.number,
                 ),
-                TextField(
-                  controller: deliveryDateController,
-                  decoration: const InputDecoration(labelText: 'Дата поставки (ДД.ММ.ГГГГ)'),
-                ),
-                TextField(
+                const Divider(),
+                const Text('Информация о товаре', style: TextStyle(fontWeight: FontWeight.bold)),
+                TextFormField(
                   controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Название товара'),
+                  decoration: const InputDecoration(labelText: 'Название товара*'),
+                  validator: (v) => v?.isEmpty ?? true ? 'Обязательное поле' : null,
                 ),
-                TextField(
+                TextFormField(
                   controller: quantityController,
-                  decoration: const InputDecoration(labelText: 'Количество'),
+                  decoration: const InputDecoration(labelText: 'Количество*'),
+                  validator: (v) => v?.isEmpty ?? true ? 'Обязательное поле' : null,
+                  keyboardType: TextInputType.number,
                 ),
-                TextField(
-                  controller: unitController, 
-                  decoration: const InputDecoration(labelText: 'Единицы измерения'),
+                DropdownButtonFormField<String>(
+                  value: selectedUnit,
+                  items: ['шт', 'л', 'кг'].map((unit) => 
+                    DropdownMenuItem(value: unit, child: Text(unit))
+                  ).toList(),
+                  onChanged: (v) => selectedUnit = v!,
+                  decoration: const InputDecoration(labelText: 'Единица измерения'),
                 ),
-                TextField(
+                TextFormField(
                   controller: priceController,
-                  decoration: const InputDecoration(labelText: 'Цена'),
+                  decoration: const InputDecoration(labelText: 'Цена*'),
+                  validator: (v) => v?.isEmpty ?? true ? 'Обязательное поле' : null,
+                  keyboardType: TextInputType.number,
+                ),
+                TextFormField(
+                  controller: deliveryDateController,
+                  decoration: const InputDecoration(labelText: 'Дата поставки (ДД.ММ.ГГГГ)*'),
+                  validator: (v) => v?.isEmpty ?? true ? 'Обязательное поле' : null,
                 ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-               
-                if (supplierNameController.text.isEmpty || addressController.text.isEmpty || directorNameController.text.isEmpty || phoneController.text.isEmpty || bankController.text.isEmpty || accountNumberController.text.isEmpty || innController.text.isEmpty || deliveryDateController.text.isEmpty || nameController.text.isEmpty || quantityController.text.isEmpty || unitController.text.isEmpty || priceController.text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Пожалуйста, заполните все поля!')),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState?.validate() ?? false) {
+                try {
+                  final newItem = StockItem(
+                    name: nameController.text,
+                    unit: selectedUnit,
+                    price: double.tryParse(priceController.text) ?? 0.0,
+                    quantity: int.tryParse(quantityController.text) ?? 0,
+                    supplier: Supplier(
+                      name: supplierNameController.text, 
+                      address: addressController.text,
+                      directorName: directorNameController.text,
+                      phone: phoneController.text,
+                      bank: bankController.text,
+                      accountNumber: accountNumberController.text,
+                      inn: innController.text,
+                    ),
+                    deliveryDate: deliveryDateController.text,
                   );
-                  return;
+
+                  await _saveStockItem(newItem);
+                  setState(() => items = _loadStockItems());
+                  Navigator.pop(context);
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('${newItem.name} успешно добавлен')),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Ошибка: $e')),
+                  );
                 }
-
-                
-                final newItem = StockItem(
-                  name: nameController.text,
-                  unit: unitController.text,
-                  price: double.tryParse(priceController.text) ?? 0.0,
-                  quantity: int.tryParse(quantityController.text) ?? 0,
-                  supplier: Supplier(
-                    name: supplierNameController.text, 
-                    address: addressController.text,
-                    directorName: directorNameController.text,
-                    phone: phoneController.text,
-                    bank: bankController.text,
-                    accountNumber: accountNumberController.text,
-                    inn: innController.text,
-                  ),
-                  deliveryDate: deliveryDateController.text,
-                );
-
-                await _saveStockItem(newItem);
-                Navigator.of(context).pop();
-              },
-              child: const Text('Сохранить'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Отмена'),
-            ),
-          ],
-        );
-      },
+              }
+            },
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
     );
-  }
-
-  Future<void> _saveStockItem(StockItem item) async {
-    try {
-      // String jsonString = jsonEncode(item.toJson());
-      final filePath = 'assets/central_warehouse.json';
-      final file = File(filePath);
-      List<dynamic> stockItems = [];
-      if (await file.exists()) {
-        String fileContent = await file.readAsString();
-        if (fileContent.isNotEmpty) {
-          stockItems = jsonDecode(fileContent);
-        }
-      }
-      stockItems.add(item.toJson());
-      await file.writeAsString(jsonEncode(stockItems));
-      print('Элемент успешно сохранен!');
-    } catch (e) {
-      print('Ошибка при сохранении элемента: $e');
-    }
   }
 }
