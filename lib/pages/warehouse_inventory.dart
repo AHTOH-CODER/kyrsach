@@ -1,31 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'dart:convert';
-import 'package:kyrsach/models.dart';
+import 'package:kyrsach/models/product.dart';
+import 'package:kyrsach/components/war.dart';
 
 class WarehouseInventory extends StatefulWidget {
   @override
-  _WarehouseInventory createState() => _WarehouseInventory();
+  _WarehouseInventoryViewState createState() => _WarehouseInventoryViewState();
 }
 
-class _WarehouseInventory extends State<WarehouseInventory> {
-  late Future<List<Product>> inventoryItems;
+class _WarehouseInventoryViewState extends State<WarehouseInventory> {
+  final WarehouseInventoryController _controller = WarehouseInventoryController();
 
   @override
   void initState() {
     super.initState();
-    inventoryItems = _loadInventory();
-  }
-
-  Future<List<Product>> _loadInventory() async {
-    try {
-      final String response = await rootBundle.loadString('assets/warehouse_inventory.json');
-      final List<dynamic> data = json.decode(response);
-      return data.map((productJson) => Product.fromJson(productJson)).toList();
-    } catch (e) {
-      print('Ошибка загрузки инвентаря: $e');
-      return [];
-    }
+    _controller.loadInventory();
   }
 
   @override
@@ -34,19 +22,18 @@ class _WarehouseInventory extends State<WarehouseInventory> {
       appBar: AppBar(
         title: const Text('Содержимое склада'),
       ),
-      body: FutureBuilder<List<Product>>(
-        future: inventoryItems,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Ошибка: ${snapshot.error}'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('Склад пуст'));
+      body: ValueListenableBuilder<List<Product>>(
+        valueListenable: _controller.inventoryItems,
+        builder: (context, inventoryData, _) {
+          if (inventoryData.isEmpty) {
+            if (_controller.isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            } else {
+              return const Center(child: Text('Склад пуст'));
+            }
           }
 
-          final inventoryData = snapshot.data!.reversed.toList();
-           return ListView.builder(
+          return ListView.builder(
             itemCount: inventoryData.length,
             itemBuilder: (context, index) {
               final item = inventoryData[index];
@@ -60,9 +47,9 @@ class _WarehouseInventory extends State<WarehouseInventory> {
                   ),
                 ),
               );
-            }
+            },
           );
-        }
+        },
       ),
     );
   }

@@ -1,8 +1,7 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:kyrsach/models.dart';
+import 'package:kyrsach/components/app.dart';
+import 'package:kyrsach/models/product.dart';
+import 'package:kyrsach/models/order_item.dart';
 
 class ApplicationPage extends StatefulWidget {
   final String level;
@@ -16,32 +15,26 @@ class ApplicationPage extends StatefulWidget {
 
 class _ApplicationPageState extends State<ApplicationPage> {
   late Future<List<OrderItem>> items;
+  late ApplicationController _controller;
 
   @override
   void initState() {
     super.initState();
-    items = _loadApplications();
+    _controller = ApplicationController(level: widget.level, store: widget.store);
+    items = _controller.loadApplications();
   }
 
-Future<List<OrderItem>> _loadApplications() async {
-  try {
-    final file = File('assets/application.json');
-    
-    final content = await file.readAsString();
-    final List<dynamic> data = json.decode(content);
-    return data.map((storeJson) => OrderItem.fromJson(storeJson)).toList();
-  } catch (e) {
-    print('Ошибка загрузки заявок: $e');
-    return [];
-  }
-}
-
-  void _createApplication(BuildContext context) {
+  void _createApplication(BuildContext context) async {
     final formKey = GlobalKey<FormState>();
     final orderDateController = TextEditingController(); 
     final nameController = TextEditingController();
     final quantityController = TextEditingController();
     String selectedUnit = 'шт';
+    
+    // Получаем текущий максимальный ID
+    final currentItems = await items;
+    int newId = currentItems.isEmpty ? 1 : 
+        (currentItems.map((item) => item.id).reduce((a, b) => a > b ? a : b) + 1);
     
     showDialog(
       context: context,
@@ -96,6 +89,7 @@ Future<List<OrderItem>> _loadApplications() async {
               onPressed: () async {
                 if (formKey.currentState?.validate() ?? false) {
                   final newItem = OrderItem(
+                    id: newId, // Используем вычисленный ID
                     status: 'Без ответа',
                     storeName: widget.store,
                     orderDate: orderDateController.text,
@@ -106,9 +100,9 @@ Future<List<OrderItem>> _loadApplications() async {
                     ),
                   );
 
-                  await _saveOrderItem(newItem);
-                  setState(() => items = _loadApplications());
                   Navigator.pop(context);
+                  await _controller.saveOrderItem(newItem);
+                  setState(() => items = _controller.loadApplications());
                   
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Заявка успешно создана!')),
@@ -123,191 +117,70 @@ Future<List<OrderItem>> _loadApplications() async {
     );
   }
 
-
-  void _acceptApplication(BuildContext context, OrderItem item) async {
-    try {
-      // 1. Загружаем данные центрального склада
-      final String warehouseResponse = await rootBundle.loadString('assets/warehouse_inventory.json');
-      List<dynamic> warehouseData = json.decode(warehouseResponse);
-      
-      // 2. Ищем нужный товар на складе
-      bool productFound = false;
-      bool enoughQuantity = false;
-      int warehouseIndex = -1;
-      
-      for (int i = 0; i < warehouseData.length; i++) {
-        if (warehouseData[i]['name'] == item.product.name && 
-            warehouseData[i]['unit'] == item.product.unit) {
-          productFound = true;
-          warehouseIndex = i;
-          if (warehouseData[i]['quantity'] >= item.product.quantity) {
-            enoughQuantity = true;
-          }
-          break;
-        }
-      }
-      
-      if (!productFound) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Товар ${item.product.name} не найден на центральном складе!')),
+  void _showApplicationDetails(BuildContext context, OrderItem item) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Детали заявки'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Название: ${item.product.name}'),
+              Text('Количество: ${item.product.quantity} ${item.product.unit}'),
+            ],
+          ),
+          actions: [
+            if (widget.level == 'admin') ...[
+              TextButton(
+                onPressed: () async {
+                  try {
+                    await _controller.acceptApplication(context, item);
+                    setState(() => items = _controller.loadApplications());
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Заявка принята! Товар перемещен в магазин.')),
+                    );
+                    Navigator.pop(context);
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(e.toString())),
+                    );
+                  }
+                },
+                child: Text('Принять'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  try {
+                    await _controller.updateApplicationStatus(item, 'Отклонено');
+                    setState(() => items = _controller.loadApplications());
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Заявка отклонена!')),
+                    );
+                    Navigator.pop(context);
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Ошибка: $e')),
+                    );
+                  }
+                },
+                child: Text('Отклонить'),
+              ),
+            ],
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Закрыть'),
+            ),
+          ],
         );
-        return;
-      }
-      
-      if (!enoughQuantity) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Недостаточно товара ${item.product.name} на центральном складе!')),
-        );
-        return;
-      }
-      
-      // 3. Загружаем данные магазинов
-      final String storesResponse = await rootBundle.loadString('assets/stores.json');
-      List<dynamic> storesData = json.decode(storesResponse);
-      
-      // 4. Находим нужный магазин и обновляем его инвентарь
-      bool storeFound = false;
-      int storeIndex = -1;
-      int productIndex = -1;
-      
-      for (int i = 0; i < storesData.length; i++) {
-        if (storesData[i]['name'] == item.storeName) {
-          storeFound = true;
-          storeIndex = i;
-          
-          // Проверяем, есть ли уже такой товар в магазине
-          for (int j = 0; j < storesData[i]['products'].length; j++) {
-            if (storesData[i]['products'][j]['name'] == item.product.name && 
-                storesData[i]['products'][j]['unit'] == item.product.unit) {
-              productIndex = j;
-              break;
-            }
-          }
-          break;
-        }
-      }
-      
-      if (!storeFound) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Магазин ${item.storeName} не найден!')),
-        );
-        return;
-      }
-      
-      // 5. Обновляем данные
-      
-      // Уменьшаем количество на центральном складе
-      warehouseData[warehouseIndex]['quantity'] -= item.product.quantity;
-      
-      // Обновляем или добавляем товар в магазин
-      if (productIndex != -1) {
-        // Товар уже есть в магазине - увеличиваем количество
-        storesData[storeIndex]['products'][productIndex]['quantity'] += item.product.quantity;
-      } else {
-        // Товара нет в магазине - добавляем новый
-        storesData[storeIndex]['products'].add({
-          'name': item.product.name,
-          'unit': item.product.unit,
-          'quantity': item.product.quantity
-        });
-      }
-      
-      // 6. Сохраняем обновленные данные
-      
-      // Сохраняем обновленный центральный склад
-      final warehouseFile = File('assets/warehouse_inventory.json');
-      await warehouseFile.writeAsString(jsonEncode(warehouseData));
-      
-      // Сохраняем обновленные данные магазинов
-      final storesFile = File('assets/stores.json');
-      await storesFile.writeAsString(jsonEncode(storesData));
-      
-      // Обновляем статус заявки
-      await _updateApplicationStatus(item, 'Принято');
-      
-      setState(() {
-        items = _loadApplications();
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Заявка принята! Товар перемещен в магазин.')),
-      );
-      
-      Navigator.of(context).pop();
-      
-    } catch (e) {
-      print('Ошибка при принятии заявки: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Произошла ошибка при обработке заявки: $e')),
-      );
-    }
+      },
+    );
   }
-
-  void _rejectApplication(BuildContext context, OrderItem item) async {
-    try {
-      // Обновляем статус заявки
-      await _updateApplicationStatus(item, 'Отклонено');
-      
-      // Обновляем UI
-      setState(() {
-        items = _loadApplications();
-      });
-      
-      // Уведомляем пользователя
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Заявка отклонена!')),
-      );
-      
-      Navigator.of(context).pop();
-    } catch (e) {
-      print('Ошибка при отклонении заявки: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Произошла ошибка при отклонении заявки: $e')),
-      );
-    }
-  }
-
-Future<void> _updateApplicationStatus(OrderItem item, String newStatus) async {
-  try {
-    final file = File('assets/application.json');
-    
-    // Загружаем текущие заявки
-    final content = await file.readAsString();
-    List<dynamic> applications = json.decode(content);
-    
-    // Находим и обновляем нужную заявку
-    bool found = false;
-    for (int i = 0; i < applications.length; i++) {
-      var app = applications[i];
-      if (app['storeName'] == item.storeName &&
-          app['orderDate'] == item.orderDate &&
-          app['product']['name'] == item.product.name &&
-          app['product']['quantity'] == item.product.quantity &&
-          app['product']['unit'] == item.product.unit) {
-        applications[i]['status'] = newStatus;
-        found = true;
-        break;
-      }
-    }
-    
-    if (!found) {
-      throw Exception('Заявка не найдена для обновления');
-    }
-    
-    // Сохраняем обновленные заявки
-    await file.writeAsString(jsonEncode(applications));
-  } catch (e) {
-    print('Ошибка при обновлении статуса заявки: $e');
-    throw e;
-  }
-}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Заявки'),
-      ),
+      appBar: AppBar(title: Text('Заявки')),
       body: FutureBuilder<List<OrderItem>>(
         future: items,
         builder: (context, snapshot) {
@@ -345,41 +218,7 @@ Future<void> _updateApplicationStatus(OrderItem item, String newStatus) async {
                   child: ListTile(
                     title: Text(item.storeName),
                     subtitle: Text('Дата: ${item.orderDate}'),
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) {
-                          return AlertDialog(
-                            title: Text('Детали заявки'),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text('Название: ${item.product.name}'),
-                                Text('Количество: ${item.product.quantity} ${item.product.unit}'),
-                              ],
-                            ),
-                            actions: [
-                              if (widget.level == 'admin') ...[
-                                TextButton(
-                                  onPressed: () => _acceptApplication(context, item),
-                                  child: Text('Принять'),
-                                ),
-                                TextButton(
-                                  onPressed: () => _rejectApplication(context, item),
-                                  child: Text('Отклонить'),
-                                ),
-                              ],
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                },
-                                child: Text('Закрыть'),
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    },
+                    onTap: () => _showApplicationDetails(context, item),
                   ),
                 ),
               );
@@ -387,36 +226,13 @@ Future<void> _updateApplicationStatus(OrderItem item, String newStatus) async {
           );
         },
       ),
-      
       floatingActionButton: widget.level == 'seller'
           ? FloatingActionButton(
-              onPressed: () {
-                _createApplication(context);
-              },
+              onPressed: () => _createApplication(context),
               child: const Icon(Icons.add),
               tooltip: 'Создать заявку',
             )
           : null, 
     );
-  }
-
-  Future<void> _saveOrderItem(OrderItem item) async {
-        try {
-          // String jsonString = jsonEncode(item.toJson());
-          final filePath = 'assets/application.json';
-          final file = File(filePath);
-          List<dynamic> orderItems = [];
-          if (await file.exists()) {
-            String fileContent = await file.readAsString();
-            if (fileContent.isNotEmpty) {
-              orderItems = jsonDecode(fileContent);
-            }
-          }
-          orderItems.add(item.toJson());
-          await file.writeAsString(jsonEncode(orderItems));
-          print('Элемент успешно сохранен!');
-        } catch (e) {
-          print('Ошибка при сохранении элемента: $e');
-        }
   }
 }

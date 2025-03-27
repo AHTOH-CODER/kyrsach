@@ -1,9 +1,9 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:kyrsach/models.dart';
 import 'package:kyrsach/pages/warehouse_inventory.dart';
+import 'package:kyrsach/components/cen.dart';
+import 'package:kyrsach/models/supplier.dart';
+import 'package:kyrsach/models/stock_item.dart';
+
 
 class CentralWarehouseScreen extends StatefulWidget {
   final String level;
@@ -16,17 +16,12 @@ class CentralWarehouseScreen extends StatefulWidget {
 
 class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
   late Future<List<StockItem>> items;
+  final CentralWarehouseController _controller = CentralWarehouseController();
   
   @override
   void initState() {
     super.initState();
-    items = _loadStockItems();
-  }
-
-  Future<List<StockItem>> _loadStockItems() async {
-    final String response = await rootBundle.loadString('assets/central_warehouse.json');
-    final List<dynamic> data = json.decode(response);
-    return data.map((storeJson) => StockItem.fromJson(storeJson)).toList();
+    items = _controller.loadStockItems();
   }
 
   @override
@@ -59,9 +54,7 @@ class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
                   child: ListTile(
                     title: Text(item.name),
                     subtitle: Text('${item.quantity} ${item.unit} - ${item.price} ₽'),
-                    onTap: () {
-                      _showSupplierInfo(context, item.supplier);
-                    },
+                    onTap: () => _showSupplierInfo(context, item.supplier),
                   ),
                 ),
               );
@@ -74,13 +67,11 @@ class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
         children: [
           if (widget.level == 'admin')
             FloatingActionButton(
-            onPressed: () {
-              _showRegisterProductDialog(context);
-            },
-            child: const Icon(Icons.add),
-            tooltip: 'Зарегистрировать товар',
-          ),
-          SizedBox(width: 16), 
+              onPressed: () => _showRegisterProductDialog(context),
+              child: const Icon(Icons.add),
+              tooltip: 'Зарегистрировать товар',
+            ),
+          const SizedBox(width: 16),
           FloatingActionButton(
             onPressed: () {
               Navigator.push(
@@ -96,74 +87,12 @@ class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
     );
   }
 
-  Future<void> _saveProductToInventory(Product product) async {
-    try {
-      final filePath = 'assets/warehouse_inventory.json';
-      final file = File(filePath);
-      List<dynamic> products = [];
-      
-      if (await file.exists()) {
-        String fileContent = await file.readAsString();
-        if (fileContent.isNotEmpty) {
-          products = jsonDecode(fileContent);
-        }
-      }
-      
-      // Проверяем, есть ли уже такой продукт
-      bool productExists = false;
-      for (int i = 0; i < products.length; i++) {
-        if (products[i]['name'] == product.name && products[i]['unit'] == product.unit) {
-          products[i]['quantity'] += product.quantity;
-          productExists = true;
-          break;
-        }
-      }
-      
-      if (!productExists) {
-        products.add(product.toJson());
-      }
-      
-      await file.writeAsString(jsonEncode(products));
-      print('Продукт успешно сохранен в инвентарь!');
-    } catch (e) {
-      print('Ошибка при сохранении продукта в инвентарь: $e');
-    }
-  }
-
-  Future<void> _saveStockItem(StockItem item) async {
-    try {
-      final filePath = 'assets/central_warehouse.json';
-      final file = File(filePath);
-      List<dynamic> stockItems = [];
-      if (await file.exists()) {
-        String fileContent = await file.readAsString();
-        if (fileContent.isNotEmpty) {
-          stockItems = jsonDecode(fileContent);
-        }
-      }
-      stockItems.add(item.toJson());
-      await file.writeAsString(jsonEncode(stockItems));
-      
-      // Сохраняем продукт в инвентарь
-      await _saveProductToInventory(Product(
-        name: item.name,
-        unit: item.unit,
-        quantity: item.quantity,
-      ));
-      
-      print('Элемент успешно сохранен!');
-    } catch (e) {
-      print('Ошибка при сохранении элемента: $e');
-    }
-  }
-
-  // Остальные методы остаются без изменений
   void _showSupplierInfo(BuildContext context, Supplier supplier) {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Поставщик:'),
+          title: const Text('Поставщик:'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -178,9 +107,7 @@ class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.pop(context),
               child: const Text('Закрыть'),
             ),
           ],
@@ -189,7 +116,7 @@ class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
     );
   }
 
-   void _showRegisterProductDialog(BuildContext context) {
+  void _showRegisterProductDialog(BuildContext context) {
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController();
     final supplierNameController = TextEditingController();
@@ -316,9 +243,9 @@ class _CentralWarehouseScreenState extends State<CentralWarehouseScreen> {
                     deliveryDate: deliveryDateController.text,
                   );
 
-                  await _saveStockItem(newItem);
-                  setState(() => items = _loadStockItems());
                   Navigator.pop(context);
+                  await _controller.saveStockItem(newItem);
+                  setState(() => items = _controller.loadStockItems());
                   
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('${newItem.name} успешно добавлен')),
