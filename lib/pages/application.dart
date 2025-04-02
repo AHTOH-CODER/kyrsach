@@ -136,7 +136,9 @@ class _ApplicationPageState extends State<ApplicationPage> {
                 onPressed: () async {
                   try {
                     await _controller.acceptApplication(context, item);
-                    setState(() => items = _controller.loadApplications());
+                    setState(() {
+                      items = _controller.loadApplications();
+                    });
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Заявка принята! Товар перемещен в магазин.')),
                     );
@@ -152,12 +154,14 @@ class _ApplicationPageState extends State<ApplicationPage> {
               TextButton(
                 onPressed: () async {
                   try {
+                    Navigator.pop(context);
                     await _controller.updateApplicationStatus(item, 'Отклонено');
-                    setState(() => items = _controller.loadApplications());
+                    setState(() {
+                      items = _controller.loadApplications();
+                    });
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Заявка отклонена!')),
                     );
-                    Navigator.pop(context);
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Ошибка: $e')),

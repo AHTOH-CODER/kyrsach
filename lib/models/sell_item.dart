@@ -1,5 +1,5 @@
-import 'package:kyrsach/models/product.dart';
 import 'package:kyrsach/models/profile.dart';
+import 'package:kyrsach/models/product.dart';
 
 class SellItem {
   double price;

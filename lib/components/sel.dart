@@ -27,7 +27,6 @@ class SellController {
 
   Future<void> saveSellItem(SellItem item, String currentStoreName) async {
     try {
-      // Обновляем данные магазина
       final storesFile = File('assets/stores.json');
       final storesContent = await storesFile.readAsString();
       final storesList = json.decode(storesContent) as List;
